@@ -1,7 +1,7 @@
 <?php
 
 namespace App\Http\Controllers;
-
+use App\Models\Voucher; 
 use Illuminate\Http\Request;
 use App\Models\Product;
 use App\Models\CartItem;
@@ -11,53 +11,89 @@ class CartController extends Controller
 {
     // Hiển thị giỏ hàng
     public function index()
-    {
-        if (Auth::check()) {
-            // Lấy giỏ hàng từ DB
-            $cartItems = CartItem::with('product')
-                ->where('user_id', Auth::id())
-                ->get();
-        } else {
-            // Lấy giỏ hàng từ session
-            $cartSession = session()->get('cart', []);
-            $cartItems = collect($cartSession)->map(function ($item, $id) {
-                $product = Product::find($id);
-                if (!$product) return null;
-                return (object)[
-                    'quantity' => $item['quantity'],
-                    'product'  => $product
-                ];
-            })->filter(); // lọc null nếu product bị xóa
-        }
+{
+    if (Auth::check()) {
+        // Lấy giỏ hàng từ DB
+        $cartItems = CartItem::with('product')
+            ->where('user_id', Auth::id())
+            ->get();
 
-        return view('cart.index', compact('cartItems'));
+        $user = Auth::user();
+        $customerGroup = $user->customer_group; // lấy nhóm khách của user
+
+        // Lấy voucher hợp lệ theo nhóm khách
+        $availableVouchers = Voucher::where('active', true)
+            ->where(function($q) use ($customerGroup) {
+                $q->whereNull('customer_group') // voucher cho tất cả
+                  ->orWhere('customer_group', $customerGroup); // hoặc cho nhóm cụ thể
+            })
+            ->where(function($q) {
+                $q->whereNull('expires_at')->orWhere('expires_at', '>=', now());
+            })
+            ->get();
+
+    } else {
+        // Lấy giỏ hàng từ session
+        $cartSession = session()->get('cart', []);
+        $cartItems = collect($cartSession)->map(function ($item, $id) {
+            $product = Product::find($id);
+            if (!$product) return null;
+            return (object)[
+                'quantity' => $item['quantity'],
+                'product'  => $product
+            ];
+        })->filter(); // lọc null nếu product bị xóa
+
+        // Nếu chưa login thì chỉ show voucher cho tất cả
+        $availableVouchers = Voucher::where('active', true)
+            ->whereNull('customer_group')
+            ->where(function($q) {
+                $q->whereNull('expires_at')->orWhere('expires_at', '>=', now());
+            })
+            ->get();
     }
+
+    return view('cart.index', compact('cartItems', 'availableVouchers'));
+}
 
     // Thêm sản phẩm vào giỏ hàng
-    public function add(Request $request, Product $product)
-    {
-        if (Auth::check()) {
-            $cartItem = CartItem::firstOrCreate(
-                ['user_id' => Auth::id(), 'product_id' => $product->id],
-                ['quantity' => 0]
-            );
-            $cartItem->quantity += 1;
-            $cartItem->save();
+    // Thêm sản phẩm vào giỏ hàng
+public function add(Request $request, Product $product)
+{
+    if (Auth::check()) {
+        $cartItem = CartItem::firstOrCreate(
+            ['user_id' => Auth::id(), 'product_id' => $product->id],
+            ['quantity' => 0]
+        );
+        $cartItem->quantity += 1;
+        $cartItem->save();
+    } else {
+        $cart = session()->get('cart', []);
+        if (isset($cart[$product->id])) {
+            $cart[$product->id]['quantity']++;
         } else {
-            $cart = session()->get('cart', []);
-            if (isset($cart[$product->id])) {
-                $cart[$product->id]['quantity']++;
-            } else {
-                $cart[$product->id] = [
-                    'id'       => $product->id,
-                    'quantity' => 1,
-                ];
-            }
-            session(['cart' => $cart]);
+            $cart[$product->id] = [
+                'id'       => $product->id,
+                'quantity' => 1,
+            ];
         }
-
-        return redirect()->route('cart.index')->with('success', 'Sản phẩm đã được thêm vào giỏ hàng.');
+        session(['cart' => $cart]);
     }
+
+    // Nếu request AJAX (JS fetch), trả về JSON
+    if ($request->ajax()) {
+        return response()->json([
+            'success' => true,
+            'cart_count' => Auth::check() 
+                ? CartItem::where('user_id', Auth::id())->sum('quantity')
+                : array_sum(array_column(session('cart', []), 'quantity')),
+        ]);
+    }
+
+    // Nếu request bình thường, redirect
+    return redirect()->route('cart.index')->with('success', 'Sản phẩm đã được thêm vào giỏ hàng.');
+}
+
 
     // Tăng số lượng
     public function increase($id)

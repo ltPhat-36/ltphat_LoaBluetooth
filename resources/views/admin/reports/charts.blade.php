@@ -93,6 +93,7 @@
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     const dataEl = document.getElementById('report-data');
+    const revenueByPaymentStatusChart = document.getElementById('revenueByPaymentStatusChart');
 
     const catLabels = JSON.parse(dataEl.dataset.catLabels || '[]');
     const catRevenue = JSON.parse(dataEl.dataset.catRevenue || '[]');
@@ -214,9 +215,30 @@ document.addEventListener('DOMContentLoaded', function () {
     if (document.getElementById('revenueByYearChart'))
         makeChart(revenueByYearChart, 'bar', revYearLabels, revYearData, 'Doanh thu (VNĐ)');
 
-    // Biểu đồ theo status
-    if (document.getElementById('revenueByPaymentStatusChart'))
-        makeChart(revenueByPaymentStatusChart, 'pie', paymentStatusLabels, paymentStatusRevenue, 'Doanh thu (VNĐ)');
+// Biểu đồ theo trạng thái thanh toán
+// Biểu đồ theo trạng thái thanh toán
+if (document.getElementById('revenueByPaymentStatusChart')) {
+    const filteredLabels = [];
+    const filteredData = [];
+
+    // Ép kiểu số để tránh chuỗi '0' hoặc undefined
+    paymentStatusLabels.forEach((label, i) => {
+        const revenue = Number(paymentStatusRevenue[i] || 0);
+       
+            filteredLabels.push(label);
+            filteredData.push(revenue);
+        
+    });
+
+    const statusChartEl = document.getElementById('revenueByPaymentStatusChart');
+
+    if (filteredData.length > 0) {
+        makeChart(statusChartEl, 'pie', filteredLabels, filteredData, 'Doanh thu (VNĐ)');
+    } else {
+        statusChartEl.parentNode.innerHTML = '<p class="text-center mt-3">Không có dữ liệu để hiển thị</p>';
+    }
+}
+
 });
 </script>
 @endsection

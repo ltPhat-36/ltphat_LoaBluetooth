@@ -103,9 +103,13 @@ class ProductController extends Controller
         return redirect()->route('admin.products.index')->with('success', 'Product deleted successfully.');
     }
     public function welcome()
-{
-    $products = \App\Models\Product::latest()->get();
-    return view('welcome', compact('products'));
-}
+    {
+        $products = Product::latest()->paginate(12);
+        $featuredProducts = Product::where('is_featured', 1)->take(8)->get();
+        $newProducts = Product::where('is_new', 1)->take(3)->get(); // sản phẩm mới
+
+        return view('welcome', compact('products', 'featuredProducts', 'newProducts'));
+    }
 
 }
+

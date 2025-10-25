@@ -9,159 +9,167 @@ use Illuminate\Support\Facades\DB;
 
 class ReportController extends Controller
 {
-    public function index(Request $request)
+    // Trang báo cáo tổng hợp
+    public function index()
     {
-        // Trạng thái đơn đã thanh toán
         $paidStatuses = ['completed'];
 
-        // 1) Doanh thu theo danh mục sản phẩm
+        // Doanh thu theo danh mục
         $categoryRevenue = DB::table('order_items')
-            ->join('products', 'order_items.product_id', '=', 'products.id')
-            ->join('orders', 'order_items.order_id', '=', 'orders.id')
+            ->join('products','order_items.product_id','=','products.id')
+            ->join('orders','order_items.order_id','=','orders.id')
             ->whereIn('orders.status', $paidStatuses)
             ->select(
                 'products.category_id',
-                DB::raw('SUM(order_items.price * order_items.quantity) AS total_revenue'),
-                DB::raw('SUM(order_items.quantity) AS total_qty')
+                DB::raw('SUM(order_items.price * order_items.quantity) as total_revenue'),
+                DB::raw('SUM(order_items.quantity) as total_qty')
             )
             ->groupBy('products.category_id')
             ->orderByDesc('total_revenue')
             ->get();
 
-        // 2) Tổng số đơn hàng (tất cả trạng thái)
         $totalOrders = Order::count();
-
-        // 3) Tổng số khách hàng (giả định cột role='customer')
         $totalCustomers = DB::table('users')->where('role', 'customer')->count();
 
-        // 4) Doanh thu theo ngày
+        // Doanh thu theo ngày, tháng, năm
         $revenueByDate = Order::whereIn('status', $paidStatuses)
-            ->selectRaw('DATE(created_at) AS date, SUM(total_price) AS total_revenue, COUNT(*) AS order_count')
+            ->selectRaw('DATE(created_at) as date, SUM(total_price) as total_revenue, COUNT(*) as order_count')
             ->groupBy(DB::raw('DATE(created_at)'))
             ->orderBy('date')
             ->get();
 
-        // 5) Doanh thu theo tháng (YYYY-MM)
         $revenueByMonth = Order::whereIn('status', $paidStatuses)
-            ->selectRaw('DATE_FORMAT(created_at, "%Y-%m") AS month, SUM(total_price) AS total_revenue, COUNT(*) AS order_count')
+            ->selectRaw('DATE_FORMAT(created_at,"%Y-%m") as month, SUM(total_price) as total_revenue, COUNT(*) as order_count')
             ->groupBy('month')
             ->orderBy('month')
             ->get();
 
-        // 6) Doanh thu theo năm
         $revenueByYear = Order::whereIn('status', $paidStatuses)
-            ->selectRaw('YEAR(created_at) AS year, SUM(total_price) AS total_revenue, COUNT(*) AS order_count')
+            ->selectRaw('YEAR(created_at) as year, SUM(total_price) as total_revenue, COUNT(*) as order_count')
             ->groupBy('year')
             ->orderBy('year')
             ->get();
 
+        // Top sản phẩm bán chạy
+        $topProducts = DB::table('order_items')
+            ->join('products','order_items.product_id','=','products.id')
+            ->join('orders','order_items.order_id','=','orders.id')
+            ->whereIn('orders.status', $paidStatuses)
+            ->select(
+                'products.id',
+                'products.name',
+                DB::raw('SUM(order_items.quantity) as total_qty'),
+                DB::raw('SUM(order_items.price * order_items.quantity) as total_revenue')
+            )
+            ->groupBy('products.id','products.name')
+            ->orderByDesc('total_qty')
+            ->limit(10)
+            ->get();
+
+        // Dữ liệu chart
+        $catLabels = $categoryRevenue->pluck('category_id');
+        $catRevenue = $categoryRevenue->pluck('total_revenue');
+
+        $revDateLabels = $revenueByDate->pluck('date');
+        $revDateData = $revenueByDate->pluck('total_revenue');
+
+        $revMonthLabels = $revenueByMonth->pluck('month');
+        $revMonthData = $revenueByMonth->pluck('total_revenue');
+
+        $revYearLabels = $revenueByYear->pluck('year');
+        $revYearData = $revenueByYear->pluck('total_revenue');
+
+        // Lấy tất cả trạng thái thực tế trong DB
+$paymentStatusLabels = Order::distinct()->pluck('status')->toArray();
+
+// Tính doanh thu từng trạng thái
+$paymentStatusRevenue = [];
+foreach($paymentStatusLabels as $status) {
+    $paymentStatusRevenue[] = (float) Order::where('status', $status)->sum('total_price');
+}
+
+
+
+
         return view('admin.reports.index', compact(
-            'categoryRevenue',
-            'totalOrders',
-            'totalCustomers',
-            'revenueByDate',
-            'revenueByMonth',
-            'revenueByYear'
+            'categoryRevenue','totalOrders','totalCustomers',
+            'revenueByDate','revenueByMonth','revenueByYear',
+            'topProducts',
+            'catLabels','catRevenue',
+            'revDateLabels','revDateData',
+            'revMonthLabels','revMonthData',
+            'revYearLabels','revYearData',
+            'paymentStatusLabels','paymentStatusRevenue'
         ));
     }
-    public function charts()
-{
-    $paidStatuses = ['completed'];
 
-    // 1) Doanh thu theo danh mục
-    $byCat = DB::table('order_items')
-        ->join('orders', 'order_items.order_id', '=', 'orders.id')
-        ->join('products', 'order_items.product_id', '=', 'products.id')
-        ->leftJoin('categories', 'products.category_id', '=', 'categories.id')
-        ->whereIn('orders.status', $paidStatuses)
-        ->selectRaw('COALESCE(categories.name, CONCAT("Category #", products.category_id)) AS name')
-        ->selectRaw('SUM(order_items.price * order_items.quantity) AS revenue')
-        ->groupBy('name')
-        ->orderByDesc('revenue')
-        ->get();
+    // Trang biểu đồ (chart view)
+    public function chartView()
+    {
+        $paidStatuses = ['completed']; // trạng thái đơn hàng được tính doanh thu
 
-    $catLabels = $byCat->pluck('name')->toArray();
-    $catRevenue = $byCat->pluck('revenue')->map(fn($v) => (float) $v)->toArray();
+        // --- Doanh thu theo danh mục ---
+        $categories = DB::table('order_items')
+            ->join('products','order_items.product_id','=','products.id')
+            ->join('orders','order_items.order_id','=','orders.id')
+            ->whereIn('orders.status', $paidStatuses)
+            ->select('products.category_id', DB::raw('SUM(order_items.price * order_items.quantity) as total_revenue'))
+            ->groupBy('products.category_id')
+            ->get();
 
-    // 2) Doanh thu theo ngày (30 ngày gần nhất)
-    $startDay = now()->subDays(29)->startOfDay();
-    $endDay = now()->endOfDay();
-    $byDate = Order::whereIn('status', $paidStatuses)
-        ->whereBetween('created_at', [$startDay, $endDay])
-        ->selectRaw('DATE(created_at) d, SUM(total_price) revenue')
-        ->groupBy('d')
-        ->orderBy('d')
-        ->get()
-        ->keyBy('d');
+        $catLabels = $categories->pluck('category_id');
+        $catRevenue = $categories->pluck('total_revenue');
 
-    $revDateLabels = [];
-    $revDateData = [];
-    for ($i = 0; $i < 30; $i++) {
-        $d = $startDay->copy()->addDays($i)->toDateString();
-        $revDateLabels[] = $d;
-        $revDateData[] = (float) ($byDate[$d]->revenue ?? 0);
-    }
+        // --- Doanh thu theo ngày (30 ngày gần nhất) ---
+        $revByDate = Order::whereIn('status', $paidStatuses)
+            ->where('created_at','>=', now()->subDays(30))
+            ->selectRaw('DATE(created_at) as date, SUM(total_price) as total_revenue')
+            ->groupBy(DB::raw('DATE(created_at)'))
+            ->orderBy('date')
+            ->get();
 
-    // 3) Doanh thu theo tháng (12 tháng gần nhất)
-    $startMonth = now()->subMonths(11)->startOfMonth();
-    $byMonth = Order::whereIn('status', $paidStatuses)
-        ->where('created_at', '>=', $startMonth)
-        ->selectRaw("DATE_FORMAT(created_at, '%Y-%m') ym, SUM(total_price) revenue")
-        ->groupBy('ym')
-        ->orderBy('ym')
-        ->get()
-        ->keyBy('ym');
+        $revDateLabels = $revByDate->pluck('date');
+        $revDateData = $revByDate->pluck('total_revenue');
 
-    $revMonthLabels = [];
-    $revMonthData = [];
-    for ($i = 0; $i < 12; $i++) {
-        $m = $startMonth->copy()->addMonths($i);
-        $key = $m->format('Y-m');
-        $revMonthLabels[] = $m->format('m/Y');
-        $revMonthData[] = (float) ($byMonth[$key]->revenue ?? 0);
-    }
+        // --- Doanh thu theo tháng (12 tháng) ---
+        $revByMonth = Order::whereIn('status', $paidStatuses)
+            ->selectRaw('DATE_FORMAT(created_at,"%Y-%m") as month, SUM(total_price) as total_revenue')
+            ->groupBy('month')
+            ->orderBy('month')
+            ->get();
 
-    // 4) Doanh thu theo năm
-    $byYear = Order::whereIn('status', $paidStatuses)
-        ->selectRaw('YEAR(created_at) y, SUM(total_price) revenue')
-        ->groupBy('y')
-        ->orderBy('y')
-        ->get();
+        $revMonthLabels = $revByMonth->pluck('month');
+        $revMonthData = $revByMonth->pluck('total_revenue');
 
-    $revYearLabels = $byYear->pluck('y')->toArray();
-    $revYearData = $byYear->pluck('revenue')->map(fn($v) => (float) $v)->toArray();
+        // --- Doanh thu theo năm ---
+        $revByYear = Order::whereIn('status', $paidStatuses)
+            ->selectRaw('YEAR(created_at) as year, SUM(total_price) as total_revenue')
+            ->groupBy('year')
+            ->orderBy('year')
+            ->get();
 
-     // 5) Doanh thu theo trạng thái đơn hàng
-$byStatus = DB::table('orders')
-->selectRaw('status, SUM(total_price) AS revenue')
-->groupBy('status')
-->get()
-->pluck('revenue', 'status');
+        $revYearLabels = $revByYear->pluck('year');
+        $revYearData = $revByYear->pluck('total_revenue');
 
-$paymentStatusLabels = $byStatus->keys()->toArray();
-$paymentStatusRevenue = $byStatus->values()->map(fn($v) => (float) $v)->toArray();
+        // --- Doanh thu theo trạng thái thanh toán ---
+        // Lấy tất cả trạng thái thực tế trong DB
+$paymentStatusLabels = Order::distinct()->pluck('status')->toArray();
 
-// Nếu tất cả đều bằng 0 → ép 1 giá trị nhỏ để Chart.js hiển thị
-if (array_sum($paymentStatusRevenue) == 0) {
-$paymentStatusRevenue = [0.01]; 
+// Tính doanh thu từng trạng thái
+$paymentStatusRevenue = [];
+foreach($paymentStatusLabels as $status) {
+    $paymentStatusRevenue[] = (float) Order::where('status', $status)->sum('total_price');
 }
 
 
- 
 
- // --- Các tổng số để tránh "Undefined variable" nếu view cần ---
- $totalOrders    = Order::count();
- $totalCustomers = DB::table('users')->where('role', 'customer')->count();
- $totalRevenue   = (float) Order::whereIn('status', $paidStatuses)->sum('total_price');
-
- // Trả view
- return view('admin.reports.charts', compact(
-    'catLabels', 'catRevenue',
-    'revDateLabels', 'revDateData',
-    'revMonthLabels', 'revMonthData',
-    'revYearLabels', 'revYearData',
-    'paymentStatusLabels', 'paymentStatusRevenue',
-    'totalOrders', 'totalCustomers', 'totalRevenue'
-));
-}
+        // --- Trả dữ liệu sang view charts ---
+        return view('admin.reports.charts', compact(
+            'catLabels','catRevenue',
+            'revDateLabels','revDateData',
+            'revMonthLabels','revMonthData',
+            'revYearLabels','revYearData',
+            'paymentStatusLabels','paymentStatusRevenue'
+        ));
+    }
 }

@@ -1,7 +1,7 @@
 <?php
 
 namespace App\Http\Controllers\User;
-
+use App\Models\Product;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Log;
 use App\Models\Order;
 use App\Models\CartItem;
 use App\Models\OrderItem;
-
+use App\Models\Voucher;
 class OrderController extends Controller
 {
     // ==========================
@@ -114,13 +114,24 @@ class OrderController extends Controller
             $productId = $item instanceof CartItem ? $item->product_id : $item['id'];
             $price     = $item instanceof CartItem ? $item->product->price : $item['price'];
             $quantity  = $item instanceof CartItem ? $item->quantity : $item['quantity'];
-
+        
             OrderItem::create([
                 'order_id'   => $order->id,
                 'product_id' => $productId,
                 'quantity'   => $quantity,
                 'price'      => $price,
             ]);
+        
+            // 🔽 Cập nhật tồn kho sản phẩm
+            $product = Product::find($productId);
+            if ($product) {
+                // Nếu muốn kiểm tra trước khi trừ:
+                if ($product->quantity < $quantity) {
+                    // rollback order hoặc báo lỗi, tùy bạn
+                    throw new \Exception("Sản phẩm {$product->name} không đủ số lượng tồn kho");
+                }
+                $product->decrement('quantity', $quantity);
+            }
         }
 
         // Xóa giỏ
@@ -128,6 +139,19 @@ class OrderController extends Controller
             CartItem::where('user_id', Auth::id())->delete();
         } else {
             session()->forget('cart');
+        }
+        if (Auth::check()) {
+            $user = auth()->user();
+            $user->save();
+        
+            // Giảm usage voucher
+            if (session('applied_voucher')) {
+                $voucher = Voucher::find(session('applied_voucher'));
+                if ($voucher) {
+                    $voucher->decrement('usage_limit');
+                    session()->forget('applied_voucher');
+                }
+            }
         }
 
         // Thanh toán MoMo

@@ -184,13 +184,22 @@ ul.specs li { margin-bottom: 8px; }
             @endif
 
             @auth
-            <form action="{{ route('cart.add',$product->id) }}" method="POST" class="mb-3">
-                @csrf
-                <button type="submit" class="btn btn-custom"><i class="bi bi-cart-plus"></i> Thêm vào giỏ hàng</button>
-            </form>
-            @else
-                <p>Vui lòng <a href="{{ route('login') }}">đăng nhập</a> để thêm sản phẩm vào giỏ hàng.</p>
-            @endauth
+<form action="{{ route('cart.add',$product->id) }}" method="POST" class="mb-3">
+    @csrf
+    <button type="submit" class="btn btn-custom"><i class="bi bi-cart-plus"></i> Thêm vào giỏ hàng</button>
+</form>
+
+{{-- Wishlist --}}
+<form action="{{ route('wishlist.toggle',$product->id) }}" method="POST" class="mb-3">
+    @csrf
+    <button type="submit" class="btn btn-outline-danger" style="border-radius:30px; padding:10px 25px;">
+        <i class="bi bi-heart"></i> 
+        {{ auth()->user()->wishlist->contains($product->id) ? 'Xóa khỏi Yêu thích' : 'Thêm vào Yêu thích' }}
+    </button>
+</form>
+@else
+    <p>Vui lòng <a href="{{ route('login') }}">đăng nhập</a> để thêm sản phẩm vào giỏ hàng hoặc yêu thích.</p>
+@endauth
 
             {{-- Đánh giá trung bình --}}
             <div class="review-summary">
@@ -211,10 +220,7 @@ ul.specs li { margin-bottom: 8px; }
             <ul class="specs">
                 <li>Danh mục: {{ $product->category->name ?? 'Chưa phân loại' }}</li>
                 <li>Số lượng còn: {{ $product->quantity }}</li>
-                <li>Trọng lượng: {{ $product->weight ?? 'Không có' }}</li>
-                <li>Kích thước: {{ $product->dimensions ?? 'Không có' }}</li>
-                <li>Màu sắc: {{ $product->color ?? 'Không có' }}</li>
-                <li>Xuất xứ: {{ $product->origin ?? 'Không có' }}</li>
+                
             </ul>
 
             {{-- Mô tả sản phẩm --}}
@@ -249,6 +255,24 @@ ul.specs li { margin-bottom: 8px; }
     @else
         <p>Chưa có đánh giá nào.</p>
     @endif
+    {{-- Gợi ý sản phẩm --}}
+<h3 style="margin-top:40px;">Có thể bạn cũng thích</h3>
+<div class="row">
+    @foreach($relatedProducts as $item)
+        <div class="col-md-3 mb-4">
+            <div class="card h-100 text-center" style="border-radius:15px; overflow:hidden;">
+                <a href="{{ route('products.show',$item->id) }}">
+                    <img src="{{ $item->image ? asset('storage/'.$item->image) : 'https://via.placeholder.com/300x300' }}" 
+                         class="card-img-top" alt="{{ $item->name }}" style="height:200px; object-fit:cover;">
+                </a>
+                <div class="card-body">
+                    <h6 class="card-title">{{ $item->name }}</h6>
+                    <p class="text-success fw-bold">{{ number_format($item->price,0,',','.') }} VNĐ</p>
+                </div>
+            </div>
+        </div>
+    @endforeach
+</div>
 </div>
 
 <script>

@@ -193,6 +193,28 @@
             </tbody>
         </table>
     </div>
+    <h3>Top sản phẩm bán chạy</h3>
+<div class="table-wrapper">
+    <table class="report-table table-bordered table-striped">
+        <thead>
+            <tr>
+                <th>Sản phẩm</th>
+                <th>Số lượng bán</th>
+                <th>Doanh thu</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach($topProducts as $product)
+            <tr>
+                <td>{{ $product->name }}</td>
+                <td>{{ $product->total_qty }}</td>
+                <td>{{ number_format($product->total_revenue, 0, ',', '.') }} VND</td>
+            </tr>
+            @endforeach
+        </tbody>
+    </table>
+</div>
+
 </div>
 @endsection
 

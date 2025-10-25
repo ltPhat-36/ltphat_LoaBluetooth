@@ -32,7 +32,7 @@ class AuthController extends Controller
         'password' => Hash::make($data['password']),
         'phone' => $data['phone'],
         'address' => $data['address'],
-        'role' => 'user',
+        'role' => 'customer',
     ]);
 
     $user->sendEmailVerificationNotification();

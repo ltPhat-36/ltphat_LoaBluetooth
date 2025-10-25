@@ -6,15 +6,10 @@ use App\Models\Product;
 
 class WelcomeController extends Controller
 {
-    /**
-     * Hiển thị trang welcome với danh sách sản phẩm
-     */
-    public function index()
-    {
-        // Lấy sản phẩm mới nhất, phân trang 12 sản phẩm/trang
-        $products = Product::latest()->paginate(12);
-
-        // Trả về view welcome.blade.php
-        return view('welcome', compact('products'));
+   public function index() {
+        $products = Product::latest()->take(12)->get();
+        $featuredProducts = Product::where('is_featured', 1)->take(3)->get();
+        $newProducts = Product::where('is_new', 1)->take(3)->get(); // sản phẩm mới
+        return view('frontend.home', compact('products', 'featuredProducts', 'newProducts'));
     }
 }

@@ -91,40 +91,49 @@
                 <tbody>
                     @php $total = 0; @endphp
                     @foreach($order->items as $item)
-                        @php
-                            $subtotal = $item->price * $item->quantity;
-                            $total += $subtotal;
-                        @endphp
-                        <tr>
-                            <td>{{ $item->product->name ?? 'Sản phẩm' }}</td>
-                            <td class="text-center">{{ $item->quantity }}</td>
-                            <td class="text-end">{{ number_format($item->price,0,',','.') }} đ</td>
-                            <td class="text-end">{{ number_format($subtotal,0,',','.') }} đ</td>
-                        </tr>
+    @php
+        $subtotal = $item->price * $item->quantity;
+        $total += $subtotal;
+    @endphp
+    <tr>
+        <td>{{ $item->product->name ?? 'Sản phẩm' }}</td>
+        <td class="text-center">{{ $item->quantity }}</td>
+        <td class="text-end">{{ number_format($item->price,0,',','.') }} đ</td>
+        <td class="text-end">{{ number_format($subtotal,0,',','.') }} đ</td>
+    </tr>
 
-                        @if($item->product)
-                        <tr>
-                            <td colspan="4">
-                                @php
-                                    $existingReview = $item->product->reviews()->where('user_id', auth()->id())->first();
-                                @endphp
+    @if($item->product && $order->status === 'completed') {{-- thêm điều kiện completed --}}
+    <tr>
+        <td colspan="4">
+            @php
+                $existingReview = $item->product->reviews()->where('user_id', auth()->id())->first();
+            @endphp
 
-                                @if($existingReview)
-                                    <div class="review-card">
-                                        ⭐ Bạn đã đánh giá: <strong>{{ $existingReview->rating }}</strong> — "{{ $existingReview->comment }}"
-                                    </div>
-                                @else
-                                    <a href="{{ route('reviews.create', $item->product->id) }}" class="btn btn-sm btn-primary mt-2">Đánh giá sản phẩm</a>
-                                @endif
-                            </td>
-                        </tr>
-                        @endif
+            @if($existingReview)
+                <div class="review-card">
+                    ⭐ Bạn đã đánh giá: <strong>{{ $existingReview->rating }}</strong> — "{{ $existingReview->comment }}"
+                </div>
+            @else
+                <a href="{{ route('reviews.create', $item->product->id) }}" class="btn btn-sm btn-primary mt-2">Đánh giá sản phẩm</a>
+            @endif
+        </td>
+    </tr>
+    @endif
+@endforeach
 
-                    @endforeach
                 </tbody>
             </table>
         </div>
         <h5 class="text-end total-price mt-3">Tổng: <span class="text-danger">{{ number_format($total,0,',','.') }} đ</span></h5>
+        {{-- Nếu đơn chưa thanh toán hoặc thất bại thì cho phép thanh toán lại --}}
+@if(in_array($order->status, ['chờ thanh toán','thanh toán MoMo thất bại']))
+    <div class="text-end mt-2">
+        <a href="{{ route('orders.momo.pay', $order) }}" class="btn btn-warning">
+            🔄 Thanh toán lại MoMo
+        </a>
+    </div>
+@endif
+
     </div>
 </div>
 @empty

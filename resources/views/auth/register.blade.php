@@ -1,58 +1,121 @@
 @extends('layouts.user')
 
 @section('content')
-<div class="container mt-5">
-    <h2>Đăng ký tài khoản</h2>
+<div class="container d-flex justify-content-center align-items-center" style="min-height: 80vh;">
+    <div class="register-card p-5 shadow-lg">
+        <h2 class="text-center mb-4 fw-bold text-success">Đăng ký tài khoản</h2>
 
-    @if ($errors->any())
-        <div class="alert alert-danger">
-            <ul class="mb-0">
-                @foreach ($errors->all() as $error)
-                    <li>{{ $error }}</li>
-                @endforeach
-            </ul>
+        @if ($errors->any())
+            <div class="alert alert-danger rounded-pill">
+                <ul class="mb-0">
+                    @foreach ($errors->all() as $error)
+                        <li>{{ $error }}</li>
+                    @endforeach
+                </ul>
+            </div>
+        @endif
+
+        @if(session('success'))
+            <div class="alert alert-success rounded-pill">
+                {{ session('success') }}
+            </div>
+        @endif
+
+        <form action="{{ route('register.post') }}" method="POST">
+            @csrf
+            <div class="mb-3">
+                <label for="name" class="form-label fw-semibold">Họ và tên</label>
+                <input type="text" name="name" id="name" class="form-control input-field" required value="{{ old('name') }}">
+            </div>
+
+            <div class="mb-3">
+                <label for="email" class="form-label fw-semibold">Địa chỉ Email</label>
+                <input type="email" name="email" id="email" class="form-control input-field" required value="{{ old('email') }}">
+            </div>
+
+            <div class="mb-3">
+                <label for="phone" class="form-label fw-semibold">Số điện thoại</label>
+                <input type="text" name="phone" id="phone" class="form-control input-field" required value="{{ old('phone') }}">
+            </div>
+
+            <div class="mb-3">
+                <label for="address" class="form-label fw-semibold">Địa chỉ</label>
+                <input type="text" name="address" id="address" class="form-control input-field" required value="{{ old('address') }}">
+            </div>
+
+            <div class="mb-3">
+                <label for="password" class="form-label fw-semibold">Mật khẩu</label>
+                <input type="password" name="password" id="password" class="form-control input-field" required>
+            </div>
+
+            <div class="mb-4">
+                <label for="password_confirmation" class="form-label fw-semibold">Xác nhận mật khẩu</label>
+                <input type="password" name="password_confirmation" id="password_confirmation" class="form-control input-field" required>
+            </div>
+
+            <button type="submit" class="btn btn-gradient w-100 fw-bold">Đăng ký</button>
+        </form>
+
+        <div class="text-center mt-3">
+            <a href="{{ route('login') }}" class="text-decoration-none text-muted">Đã có tài khoản? Đăng nhập</a>
         </div>
-    @endif
-
-    @if(session('success'))
-        <div class="alert alert-success">
-            {{ session('success') }}
-        </div>
-    @endif
-
-    <form action="{{ route('register.post') }}" method="POST">
-        @csrf
-        <div class="mb-3">
-            <label for="name" class="form-label">Họ và tên</label>
-            <input type="text" name="name" id="name" class="form-control" required value="{{ old('name') }}">
-        </div>
-
-        <div class="mb-3">
-            <label for="email" class="form-label">Địa chỉ Email</label>
-            <input type="email" name="email" id="email" class="form-control" required value="{{ old('email') }}">
-        </div>
-
-        <div class="mb-3">
-            <label for="phone" class="form-label">Số điện thoại</label>
-            <input type="text" name="phone" id="phone" class="form-control" required value="{{ old('phone') }}">
-        </div>
-
-        <div class="mb-3">
-            <label for="address" class="form-label">Địa chỉ</label>
-            <input type="text" name="address" id="address" class="form-control" required value="{{ old('address') }}">
-        </div>
-
-        <div class="mb-3">
-            <label for="password" class="form-label">Mật khẩu</label>
-            <input type="password" name="password" id="password" class="form-control" required>
-        </div>
-
-        <div class="mb-3">
-            <label for="password_confirmation" class="form-label">Xác nhận mật khẩu</label>
-            <input type="password" name="password_confirmation" id="password_confirmation" class="form-control" required>
-        </div>
-
-        <button type="submit" class="btn btn-success">Đăng ký</button>
-    </form>
+    </div>
 </div>
+
+<style>
+body {
+    background: #f0f4f8;
+    font-family: 'Inter', sans-serif;
+}
+
+.register-card {
+    background: #ffffff;
+    border-radius: 20px;
+    max-width: 450px;
+    width: 100%;
+    transition: all 0.3s ease;
+}
+
+.register-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 20px 40px rgba(0,0,0,0.08);
+}
+
+.input-field {
+    border-radius: 12px;
+    border: 1px solid #d1d5db;
+    padding: 12px 14px;
+    transition: border-color 0.3s, box-shadow 0.3s;
+}
+
+.input-field:focus {
+    border-color: #10b981;
+    box-shadow: 0 0 0 3px rgba(16,185,129,0.2);
+    outline: none;
+}
+
+.btn-gradient {
+    background: linear-gradient(135deg, #10b981, #34d399);
+    color: #fff;
+    border-radius: 12px;
+    padding: 12px 0;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+}
+
+.btn-gradient:hover {
+    transform: scale(1.05);
+    box-shadow: 0 8px 20px rgba(16,185,129,0.3);
+}
+
+.alert {
+    font-size: 0.9rem;
+    border-radius: 12px;
+    padding: 10px 15px;
+}
+
+.text-success {
+    color: #10b981 !important;
+}
+</style>
 @endsection
